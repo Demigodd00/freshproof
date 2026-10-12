@@ -18,7 +18,7 @@ DatasetBond evaluates a commissioned dataset delivery once against five quality 
 
 This is a StudioNet test-GEN product, not a guarantee that the underlying public data is true. It checks whether changes are disclosed faithfully within the frozen scope. The repository does not claim live behavior: the verified-deployment record is intentionally empty, and a local GLSim integration smoke test is currently marked expected-failure because GLSim 0.29.2 intermittently fails storage allocation and returns an empty ABI for this contract. A finalized StudioNet lifecycle is still required before submission-readiness claims.
 
-The app will not enable post-deployment signing merely because its own create action returned a hash. A StudioNet receipt, onchain source match, and the published deployment record must first agree. Public read-only inspection of any address remains available separately.
+The app will not enable post-deployment signing merely because its own create action returned a hash. The transaction must finalize and the onchain contract source must match the exact source published with this app. This lets a sponsor continue with a newly created covenant without a manual repository edit. A separately published deployment record is still required before presenting any particular covenant as the canonical public demo. Unmatched addresses remain read-only.
 
 ## Local checks
 

@@ -41,14 +41,19 @@ export async function readCredit(address:Address,account:Address):Promise<string
 export async function verifyDeployment(deployment:Deployment):Promise<Address>{
   if(!deployment.verified||deployment.network!=='studionet'||deployment.chainId!==61999||!addressPattern.test(deployment.address||'')||!deployment.sourceSha256||!hashPattern.test('0x'+deployment.sourceSha256))throw new Error('No verified StudioNet FreshProof deployment is configured.');
   const address=deployment.address as Address;
+  await verifyContractSource(address,deployment.sourceSha256);
+  return address;
+}
+
+export async function verifyContractSource(address:Address,expectedHash?:string):Promise<Address>{
+  if(!addressPattern.test(address))throw new Error('Enter a valid StudioNet contract address.');
   const local=await fetch('/contract-source.py',{cache:'no-store'});
   if(!local.ok)throw new Error('Published contract source is missing.');
   const localCode=(await local.text()).replaceAll('\r\n','\n');
-  const expected=deployment.sourceSha256.toLowerCase();
   const localHash=await sha256(new TextEncoder().encode(localCode));
-  if(localHash!==expected)throw new Error('Published contract source does not match the deployment record.');
+  if(expectedHash&&localHash!==expectedHash.toLowerCase())throw new Error('Published contract source does not match the recorded deployment source.');
   const chainCode=(await reader.getContractCode(address)).replaceAll('\r\n','\n');
-  if(await sha256(new TextEncoder().encode(chainCode))!==expected)throw new Error('Onchain source does not match this app release. Live signing is blocked.');
+  if(await sha256(new TextEncoder().encode(chainCode))!==localHash)throw new Error('Onchain source does not match this app release. Live signing is blocked.');
   return address;
 }
 
@@ -89,7 +94,7 @@ export function formatError(error:unknown):string{
 }
 
 export async function send(
-  deployment:Deployment,
+  address:Address,
   wallet:{address:Address;provider:Provider},
   method:'fund'|'submit'|'review'|'close'|'withdraw',
   args:unknown[]=[],
@@ -105,9 +110,7 @@ export async function send(
     let requested=false;
     let known:Pending|undefined;
     try{
-      const fresh=await loadDeployment();
-      if(fresh.address!==deployment.address||fresh.sourceSha256!==deployment.sourceSha256)throw new Error('Deployment changed. Reload before signing.');
-      const address=await verifyDeployment(fresh);
+      await verifyContractSource(address);
       await checkWallet(wallet.address,wallet.provider);
       const guarded:Provider={request:async input=>{
         const submitting=['eth_sendTransaction','eth_sendRawTransaction'].includes(input.method);
@@ -192,7 +195,10 @@ export async function pollPending():Promise<{pending:Pending;state:'pending'|'su
   const result=String(r.resultName??r.result_name??'').toUpperCase();
   const state=execution==='FINISHED_WITH_RETURN'&&result!=='FAILURE'?'success':execution==='FINISHED_WITH_ERROR'||result==='FAILURE'?'error':'unknown';
   if(state==='unknown')return {pending,state};
-  const deployed=(r.data&&typeof r.data==='object'?(r.data as Record<string,unknown>).contract_address:undefined);
+  const decoded=r.txDataDecoded&&typeof r.txDataDecoded==='object'?r.txDataDecoded as Record<string,unknown>:{};
+  const data=r.data&&typeof r.data==='object'?r.data as Record<string,unknown>:{};
+  const deployed=decoded.contractAddress??data.contract_address;
+  if(pending.method==='deploy'&&state==='success'&&!(typeof deployed==='string'&&addressPattern.test(deployed)))return {pending,state:'unknown'};
   localStorage.removeItem(pendingKey);
   return {pending,state,contractAddress:typeof deployed==='string'&&addressPattern.test(deployed)?deployed as Address:undefined};
 }
