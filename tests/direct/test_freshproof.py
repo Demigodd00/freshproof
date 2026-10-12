@@ -192,13 +192,19 @@ def test_failed_release_can_be_corrected_once_with_prior_attempt_visible(direct_
         contract.submit(2, "d" * 40, "f" * 64)
 
 
-def test_ten_minute_demo_cadence_is_allowed_but_shorter_is_not(direct_vm, direct_deploy, direct_alice, direct_bob):
+def test_ten_minute_demo_cadence_is_allowed(direct_vm, direct_deploy, direct_alice, direct_bob):
     direct_vm.warp("2026-10-12T00:00:00Z")
     direct_vm.sender = direct_alice
     args = [addr(direct_bob), "Demigodd00", "freshproof", "evidence/demo/release.json",
             RULE, START, 600, 120, 2, REWARD]
     contract = direct_deploy(str(CONTRACT), *args, sdk_version=SDK)
     assert contract.get_state()["period_seconds"] == "600"
-    args[6] = 599
+
+
+def test_cadence_shorter_than_ten_minutes_is_rejected(direct_vm, direct_deploy, direct_alice, direct_bob):
+    direct_vm.warp("2026-10-12T00:00:00Z")
+    direct_vm.sender = direct_alice
+    args = [addr(direct_bob), "Demigodd00", "freshproof", "evidence/demo/release.json",
+            RULE, START, 599, 120, 2, REWARD]
     with direct_vm.expect_revert("invalid_schedule"):
         direct_deploy(str(CONTRACT), *args, sdk_version=SDK)

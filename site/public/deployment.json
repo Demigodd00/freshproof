@@ -1,9 +1,8 @@
 {
   "network": "studionet",
   "chainId": 61999,
-  "address": null,
-  "sourceSha256": null,
-  "verified": false,
-  "note": "No FreshProof contract deployment has been verified yet. The interface must not offer live signing until this record is replaced with checked deployment evidence."
+  "address": "0xcC85C4B00c590b430a3fEBD8E579183062Fe8A61",
+  "sourceSha256": "83b4f67b1d7e61734aa10b1fbceaf9bb4b25dcd4110000264bad2ac53fb875d1",
+  "verified": true,
+  "note": "StudioNet source-verified controlled test covenant. Deployment and funding have finalized; release review and settlement receipts are recorded separately in deployments/studionet-demo.json as they complete."
 }
-
