@@ -51,11 +51,26 @@ def transaction_hash(value) -> str:
     return "0x" + bytes(value).hex()
 
 
+def rpc_read(label: str, operation):
+    for attempt in range(12):
+        try:
+            return operation()
+        except Exception as error:
+            detail = str(error).lower()
+            transient = any(token in detail for token in (
+                "502", "503", "504", "bad gateway", "timeout", "connection aborted", "remote disconnected",
+            ))
+            if attempt == 11 or not transient:
+                raise
+            print(f"{label}: temporary StudioNet RPC error; retrying read only.", flush=True)
+            time.sleep(5)
+
+
 def finalized(client, hash_: str, *, system: bool = False) -> dict:
-    receipt = client.wait_for_transaction_receipt(
+    receipt = rpc_read(f"Receipt {hash_}", lambda: client.wait_for_transaction_receipt(
         hash_, status=TransactionStatus.FINALIZED, interval=5000, retries=180,
         full_transaction=True,
-    )
+    ))
     if receipt.get("status_name", receipt.get("statusName")) != TransactionStatus.FINALIZED.value:
         raise RuntimeError(f"Not finalized: {hash_}")
     if not system and not tx_execution_succeeded(receipt):
@@ -84,14 +99,14 @@ def step(proof: dict, client, name: str, send, *, system: bool = False) -> dict:
 
 
 def read(client, contract: str, method: str, args: list) -> dict | str:
-    return client.read_contract(
+    return rpc_read(method, lambda: client.read_contract(
         address=contract, function_name=method, args=args,
         transaction_hash_variant=TransactionHashVariant.LATEST_FINAL,
-    )
+    ))
 
 
 def verify_source(client, address: str) -> str:
-    response = client.provider.make_request("gen_getContractCode", [address])
+    response = rpc_read("gen_getContractCode", lambda: client.provider.make_request("gen_getContractCode", [address]))
     encoded = response.get("result")
     if not isinstance(encoded, str):
         raise RuntimeError("Onchain source unavailable")
@@ -135,7 +150,7 @@ def main() -> None:
     publisher_client = create_client(chain=studionet, account=publisher)
 
     step(proof, sponsor_client, "faucet", lambda: sponsor_client.fund_account(sponsor.address, 10**16), system=True)
-    if int(sponsor_client.get_balance(sponsor.address)) < EPOCHS * REWARD:
+    if int(rpc_read("get_balance", lambda: sponsor_client.get_balance(sponsor.address))) < EPOCHS * REWARD:
         raise RuntimeError("Sponsor faucet balance is insufficient")
 
     if "deploy" not in proof["transactions"] and int(time.time()) + 60 >= proof["startUnix"]:
@@ -178,15 +193,15 @@ def main() -> None:
             address=contract, function_name="submit", args=[epoch, commit, digest],
         ))
         submitted = read(sponsor_client, contract, "get_epoch", [epoch])
-        if submitted["state"] != "SUBMITTED" or submitted["commit_sha"] != commit:
+        if submitted["state"] not in ("SUBMITTED", "REVIEWED_PASS", "CLOSED_PAID") or submitted["commit_sha"] != commit:
             raise RuntimeError(f"Epoch {epoch} submission missing from finalized state")
         step(proof, sponsor_client, f"review{epoch}", lambda epoch=epoch: sponsor_client.write_contract(
             address=contract, function_name="review", args=[epoch],
         ))
         reviewed = read(sponsor_client, contract, "get_epoch", [epoch])
-        proof[f"review{epoch}"] = reviewed
+        proof.setdefault(f"review{epoch}", reviewed)
         save(PROOF, proof)
-        if reviewed["state"] != "REVIEWED_PASS" or reviewed["verdict"] != "PASS":
+        if reviewed["state"] not in ("REVIEWED_PASS", "CLOSED_PAID") or reviewed["verdict"] != "PASS":
             raise RuntimeError(f"Epoch {epoch} was not approved by GenLayer validators")
         if epoch == 2 and (reviewed["corrected"], reviewed["added"], reviewed["baseline_epoch"]) != ("1", "1", "1"):
             raise RuntimeError("Corrected release delta does not match expected counts")
@@ -195,16 +210,16 @@ def main() -> None:
             address=contract, function_name="close", args=[epoch],
         ))
         closed = read(sponsor_client, contract, "get_epoch", [epoch])
-        proof[f"close{epoch}"] = closed
+        proof.setdefault(f"close{epoch}", closed)
         save(PROOF, proof)
         if closed["state"] != "CLOSED_PAID":
             raise RuntimeError(f"Epoch {epoch} did not settle as paid")
-        if int(read(sponsor_client, contract, "get_credit", [publisher.address])) < REWARD:
+        if f"withdraw{epoch}" not in proof["transactions"] and int(read(sponsor_client, contract, "get_credit", [publisher.address])) < REWARD:
             raise RuntimeError("Expected publisher credit is missing")
         step(proof, publisher_client, f"withdraw{epoch}", lambda: publisher_client.write_contract(
             address=contract, function_name="withdraw", args=[],
         ))
-        if read(sponsor_client, contract, "get_credit", [publisher.address]) != "0":
+        if f"close{epoch + 1}" not in proof["transactions"] and read(sponsor_client, contract, "get_credit", [publisher.address]) != "0":
             raise RuntimeError("Publisher credit did not clear after withdrawal")
     final = read(sponsor_client, contract, "get_state", [])
     if final["total_credited"] != str(EPOCHS * REWARD) or final["total_withdrawn"] != str(EPOCHS * REWARD):

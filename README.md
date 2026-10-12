@@ -2,7 +2,7 @@
 
 FreshProof is a GenLayer-native **public-data change covenant**. A sponsor funds a fixed number of publication epochs. A named publisher commits immutable GitHub snapshots of a public data feed. Each later snapshot must disclose material additions, corrections, and removals relative to the last accepted snapshot. Validators independently fetch the pinned snapshots and decide whether the accompanying plain-language change log faithfully explains the changes. Fixed contract rules, never the model, assign each epoch's GEN payment or refund.
 
-This is a standalone Project app, not a contract-only demo. It includes a sponsor/publisher workspace, public release timeline and diff inspector, wallet transactions, native contract, read-only verifier, tests, deployment records, and reviewer documentation. The contract is not deployed yet; until a deployment record and finalized receipts exist, the interface must identify examples as demonstrations.
+This is a standalone Project app, not a contract-only demo. It includes a sponsor/publisher workspace, public release timeline and diff inspector, wallet transactions, native contract, read-only verifier, tests, deployment records, and reviewer documentation. A source-verified, funded [StudioNet covenant](https://explorer-studio.genlayer.com/address/0xcC85C4B00c590b430a3fEBD8E579183062Fe8A61) has completed two release epochs, including validator reviews, fixed payouts, and withdrawals. The [public proof record](deployments/studionet-demo.json) links the finalized transactions and reads.
 
 ## Distinction from DatasetBond and Eligibility Judge
 
@@ -16,7 +16,7 @@ DatasetBond evaluates a commissioned dataset delivery once against five quality 
 - A finalization-safe close credits the publisher for a passing epoch or refunds the sponsor for a failed/missed one. Credits are pulled by their owner.
 - A public verifier re-fetches snapshots and shows what was recorded onchain versus what is independently reproducible.
 
-This is a StudioNet test-GEN product, not a guarantee that the underlying public data is true. It checks whether changes are disclosed faithfully within the frozen scope. A [StudioNet deployment-and-read smoke test](deploy/smoke.json) has finalized successfully, but it is **not funded and not a full lifecycle demo**. The canonical verified-deployment record is intentionally empty. GLSim 0.29.2 remains inconsistent on local deployment/schema reads; its integration test is no longer marked expected-failure. A finalized funded StudioNet lifecycle is still required before submission-readiness claims.
+This is a StudioNet test-GEN product, not a guarantee that the underlying public data is true. It checks whether changes are disclosed faithfully within the frozen scope. The funded demo used two disposable test accounts and faucet GEN; it proves the app's contract workflow, not independent adoption or the factual accuracy of the sample river data. The browser verifier independently reproduced the pinned bytes, structural deltas, and onchain counts for both epochs. Failed-review and refund branches have direct-mode test coverage but have not been exercised in this hosted StudioNet demo.
 
 The app will not enable post-deployment signing merely because its own create action returned a hash. The transaction must finalize and the onchain contract source must match the exact source published with this app. This lets a sponsor continue with a newly created covenant without a manual repository edit. A separately published deployment record is still required before presenting any particular covenant as the canonical public demo. Unmatched addresses remain read-only.
 
@@ -33,4 +33,4 @@ pnpm test
 pnpm build
 ```
 
-See the [review-readiness checklist](docs/REVIEW_READINESS.md), [architecture](docs/ARCHITECTURE.md), [evidence format](docs/EVIDENCE_FORMAT.md), and [two commit-pinned example releases](docs/DEMO.md).
+See the [review-readiness report](docs/REVIEW_READINESS.md), [submission links](docs/SUBMISSION.md), [architecture](docs/ARCHITECTURE.md), [evidence format](docs/EVIDENCE_FORMAT.md), and [two commit-pinned live-demo releases](docs/DEMO.md).

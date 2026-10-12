@@ -1,6 +1,6 @@
 # Two immutable example releases
 
-The dedicated FreshProof repository contains a genuinely versioned sample feed. These are **illustrative Git evidence**, not a claim that the covenant has been deployed or that a validator reviewed it onchain.
+The dedicated FreshProof repository contains a genuinely versioned sample feed. It is illustrative river data, not a claim about real-world measurements. These exact two commits were submitted to the [funded StudioNet demo covenant](https://explorer-studio.genlayer.com/address/0xcC85C4B00c590b430a3fEBD8E579183062Fe8A61) and reviewed by validators; the [finalized receipt record](../deployments/studionet-demo.json) separates that onchain evidence from the sample data's factual accuracy.
 
 | Release | Full commit | Raw manifest SHA-256 | Structural delta |
 | --- | --- | --- | --- |
