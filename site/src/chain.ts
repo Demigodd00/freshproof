@@ -14,13 +14,14 @@ export type EpochState={epoch:string;state:string;deadline:string;commit_sha?:st
 const pendingKey='freshproof:pending:61999';
 const addressPattern=/^0x[0-9a-fA-F]{40}$/;
 const hashPattern=/^0x[0-9a-fA-F]{64}$/;
+const assetBase=import.meta.env.BASE_URL;
 const reader=createClient({chain:chains.studionet});
 let signing=false;
 
 export function browserProvider():Provider|null{return (window as Window&{ethereum?:Provider}).ethereum||null;}
 
 export async function loadDeployment():Promise<Deployment>{
-  const response=await fetch('/deployment.json',{cache:'no-store'});
+  const response=await fetch(`${assetBase}deployment.json`,{cache:'no-store'});
   if(!response.ok)throw new Error('Deployment record unavailable.');
   return await response.json() as Deployment;
 }
@@ -47,7 +48,7 @@ export async function verifyDeployment(deployment:Deployment):Promise<Address>{
 
 export async function verifyContractSource(address:Address,expectedHash?:string):Promise<Address>{
   if(!addressPattern.test(address))throw new Error('Enter a valid StudioNet contract address.');
-  const local=await fetch('/contract-source.py',{cache:'no-store'});
+  const local=await fetch(`${assetBase}contract-source.py`,{cache:'no-store'});
   if(!local.ok)throw new Error('Published contract source is missing.');
   const localCode=(await local.text()).replaceAll('\r\n','\n');
   const localHash=await sha256(new TextEncoder().encode(localCode));
@@ -147,7 +148,7 @@ export async function createCovenant(
 ):Promise<Pending>{
   if(signing||savedPending())throw new Error('A transaction is already pending. Check its status before another write.');
   if(!navigator.locks)throw new Error('A modern HTTPS browser is required for safe wallet signing.');
-  const source=await fetch('/contract-source.py',{cache:'no-store'});
+  const source=await fetch(`${assetBase}contract-source.py`,{cache:'no-store'});
   if(!source.ok)throw new Error('Published contract source is unavailable. Deployment is blocked.');
   const code=(await source.text()).replaceAll('\r\n','\n');
   const digest=await sha256(new TextEncoder().encode(code));

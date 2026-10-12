@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5198",
     "build": "node scripts/sync-contract.mjs && tsc --noEmit && vite build",
+    "build:pages": "node scripts/sync-contract.mjs && tsc --noEmit && vite build --base=/freshproof/",
     "test": "vitest run"
   },
   "dependencies": {
