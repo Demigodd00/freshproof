@@ -1,12 +1,12 @@
 import './style.css';
 import {browserProvider,connectWallet,createCovenant,formatError,loadDeployment,pinnedUrl,pollPending,readCredit,readEpoch,readState,savedPending,send,verifyContractSource,verifyDeployment} from './chain';
 import type {Address,ChainState,Deployment,EpochState} from './chain';
-import {canonicalDelta,deriveDelta,disclosureCoverage,fetchPinnedManifest,rawUrl,sha256} from './verify';
+import {canonicalDelta,deriveDelta,releaseCoverage,fetchPinnedManifest,rawUrl,sha256} from './verify';
 import type {Delta,Manifest} from './verify';
 import {formatGen as gen,parseGenAtto as atto} from './money';
 
 type Mode='example'|'live';
-type Inspection={current:Manifest;baseline:Manifest|null;delta:Delta;coverage:ReturnType<typeof disclosureCoverage>;digestOk:boolean;countsOk:boolean;currentUrl:string;baselineUrl:string|null};
+type Inspection={current:Manifest;baseline:Manifest|null;delta:Delta;coverage:ReturnType<typeof releaseCoverage>;digestOk:boolean;countsOk:boolean;currentUrl:string;baselineUrl:string|null};
 const app=document.querySelector<HTMLDivElement>('#app')!;
 const query=new URLSearchParams(location.search);
 let mode:Mode=query.get('contract')?'live':'example';
@@ -85,7 +85,7 @@ async function inspect(){
     const delta=deriveDelta(baseline,current);
     const digest=await sha256(new TextEncoder().encode(canonicalDelta(delta)));
     const countsOk=Number(row.added)===delta.added.length&&Number(row.corrected)===delta.corrected.length&&Number(row.removed)===delta.removed.length;
-    inspection={current,baseline,delta,coverage:disclosureCoverage(delta,current),digestOk:row.delta_sha256===digest,countsOk,currentUrl,baselineUrl};
+    inspection={current,baseline,delta,coverage:releaseCoverage(baseline,delta,current),digestOk:row.delta_sha256===digest,countsOk,currentUrl,baselineUrl};
     message('Pinned source fetched and independently compared with finalized onchain fields.','good');
   }catch(error){inspection=null;message(formatError(error),'error');}
   finally{setBusy(false);}
@@ -176,7 +176,7 @@ function renderInspection(){
   if(!inspection)return '';
   const i=inspection;
   const lines=(['added','corrected','removed'] as const).flatMap(kind=>i.delta[kind].map(id=>`<div class="diff-row"><span class="diff-symbol">${kind==='added'?'+':kind==='corrected'?'~':'−'}</span><div><b>${esc(id)}</b><small>${kind==='added'?`New: ${esc(i.delta.new[id])}`:kind==='removed'?`Previous: ${esc(i.delta.old[id])}`:`${esc(i.delta.old[id])} → ${esc(i.delta.new[id])}`}</small></div></div>`)).join('');
-  return `<section class="verification panel" id="verifier"><div class="panel-kicker">INDEPENDENT BROWSER VERIFICATION <span>FINALIZED SOURCE</span></div><h3>${esc(i.current.title)}</h3><div class="checks"><div class="${i.digestOk?'pass':'fail'}">${i.digestOk?'✓':'×'} Derived delta matches onchain SHA-256</div><div class="${i.countsOk?'pass':'fail'}">${i.countsOk?'✓':'×'} Added / corrected / removed counts match</div><div class="${i.coverage.ok?'pass':'fail'}">${i.coverage.ok?'✓':'×'} Every structural change has a disclosure</div></div>${!i.coverage.ok?`<p class="mismatch">Missing: ${esc(i.coverage.missing.join(', ')||'none')} · Unexpected: ${esc(i.coverage.unexpected.join(', ')||'none')}</p>`:''}<div class="diff-list">${lines||'<div class="empty-diff">No structural change in this snapshot.</div>'}</div><p class="verification-note">This verifies the pinned bytes and exact structural delta. The semantic adequacy of explanations is the validator verdict recorded by GenLayer; browser checks do not independently reproduce validator inference.</p><div class="proof-links"><a href="${esc(i.currentUrl)}" target="_blank" rel="noopener noreferrer">Current pinned source ↗</a>${i.baselineUrl?`<a href="${esc(i.baselineUrl)}" target="_blank" rel="noopener noreferrer">Baseline pinned source ↗</a>`:''}</div></section>`;
+  return `<section class="verification panel" id="verifier"><div class="panel-kicker">INDEPENDENT BROWSER VERIFICATION <span>FINALIZED SOURCE</span></div><h3>${esc(i.current.title)}</h3><div class="checks"><div class="${i.digestOk?'pass':'fail'}">${i.digestOk?'✓':'×'} Derived delta matches onchain SHA-256</div><div class="${i.countsOk?'pass':'fail'}">${i.countsOk?'✓':'×'} Added / corrected / removed counts match</div><div class="${i.coverage.ok?'pass':'fail'}">${i.coverage.ok?'✓':'×'} ${i.baseline?'Every structural change has a disclosure':'Initial baseline has records and no change claims'}</div></div>${!i.coverage.ok?`<p class="mismatch">Missing: ${esc(i.coverage.missing.join(', ')||'none')} · Unexpected: ${esc(i.coverage.unexpected.join(', ')||'none')}</p>`:''}<div class="diff-list">${lines||'<div class="empty-diff">No structural change in this snapshot.</div>'}</div><p class="verification-note">This verifies the pinned bytes and exact structural delta. The semantic adequacy of explanations is the validator verdict recorded by GenLayer; browser checks do not independently reproduce validator inference.</p><div class="proof-links"><a href="${esc(i.currentUrl)}" target="_blank" rel="noopener noreferrer">Current pinned source ↗</a>${i.baselineUrl?`<a href="${esc(i.baselineUrl)}" target="_blank" rel="noopener noreferrer">Baseline pinned source ↗</a>`:''}</div></section>`;
 }
 
 function renderPrior(){

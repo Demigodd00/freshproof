@@ -60,6 +60,14 @@ export function disclosureCoverage(delta:Delta,manifest:Manifest):{ok:boolean;mi
   };
 }
 
+export function releaseCoverage(previous:Manifest|null,delta:Delta,manifest:Manifest):{ok:boolean;missing:string[];unexpected:string[]}{
+  if(previous===null){
+    const unexpected=manifest.changes.map(row=>row.id);
+    return {ok:manifest.records.length>0&&unexpected.length===0,missing:[],unexpected};
+  }
+  return disclosureCoverage(delta,manifest);
+}
+
 export function canonicalDelta(delta:Delta):string{
   // Match Python's sort_keys=True compact JSON used by the contract.
   const ordered=(value:unknown):unknown=>Array.isArray(value)?value.map(ordered):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(k=>[k,ordered((value as Record<string,unknown>)[k])])):value;
@@ -75,4 +83,3 @@ export async function fetchPinnedManifest(url:string,digest:string,period:number
   if(await sha256(bytes)!==digest.toLowerCase())throw new Error('Pinned source hash does not match onchain evidence.');
   return parseManifest(JSON.parse(new TextDecoder().decode(bytes)),period);
 }
-
