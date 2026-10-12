@@ -10,13 +10,15 @@ DatasetBond evaluates a commissioned dataset delivery once against five quality 
 
 ## Reviewable MVP
 
-- A sponsor freezes publisher, public GitHub repository and manifest path, semantic disclosure rule, epoch cadence, and fixed per-epoch reward.
+- A sponsor can create a covenant from the app, freezing the publisher, public GitHub repository and manifest path, semantic disclosure rule, epoch cadence, and fixed per-epoch reward. The source and wallet transaction are tracked without an automatic retry; funding is a separate transaction.
 - The publisher submits a commit-pinned release and SHA-256 digest. Anyone can invoke its review.
 - Deterministic checks compute the exact record-ID delta. An intelligent GenLayer transaction judges whether the change log faithfully describes that delta; validators independently refetch both snapshots and agree on the material decision.
 - A finalization-safe close credits the publisher for a passing epoch or refunds the sponsor for a failed/missed one. Credits are pulled by their owner.
 - A public verifier re-fetches snapshots and shows what was recorded onchain versus what is independently reproducible.
 
 This is a StudioNet test-GEN product, not a guarantee that the underlying public data is true. It checks whether changes are disclosed faithfully within the frozen scope. The repository does not claim live behavior: the verified-deployment record is intentionally empty, and a local GLSim integration smoke test is currently marked expected-failure because GLSim 0.29.2 intermittently fails storage allocation and returns an empty ABI for this contract. A finalized StudioNet lifecycle is still required before submission-readiness claims.
+
+The app will not enable post-deployment signing merely because its own create action returned a hash. A StudioNet receipt, onchain source match, and the published deployment record must first agree. Public read-only inspection of any address remains available separately.
 
 ## Local checks
 

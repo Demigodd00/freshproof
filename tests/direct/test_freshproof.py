@@ -39,11 +39,15 @@ def fund(contract, vm, sponsor):
     vm.value = 0
 
 
+def warp(vm, timestamp):
+    """Keep the direct VM's contract-visible time in sync on Windows and Linux."""
+    vm.warp(timestamp)
+    from genlayer import gl
+    gl.message_raw["datetime"] = timestamp
+
+
 def submit(contract, vm, publisher, epoch, commit, body):
     vm.sender = publisher
-    from genlayer import gl
-    observed = gl.message_raw["datetime"]
-    print(f"CLOCK expected={vm._datetime} observed={observed} epoch={epoch} deadline={contract.get_epoch(epoch)['deadline']}")
     contract.submit(epoch, commit, hashlib.sha256(body.encode()).hexdigest())
     vm.mock_web(
         rf"raw\.githubusercontent\.com/Demigodd00/freshproof/{commit}/evidence/demo/release\.json",
@@ -54,13 +58,13 @@ def submit(contract, vm, publisher, epoch, commit, body):
 def test_release_history_pass_and_fixed_credits(direct_vm, direct_deploy, direct_alice, direct_bob):
     contract = deploy(direct_vm, direct_deploy, direct_alice, direct_bob)
     fund(contract, direct_vm, direct_alice)
-    direct_vm.warp("2026-10-12T01:10:00Z")
+    warp(direct_vm, "2026-10-12T01:10:00Z")
     baseline, _ = release(1, [{"id": "route-1", "value": "Open 07:00-21:00"}], [])
     submit(contract, direct_vm, direct_bob, 1, "a" * 40, baseline)
     contract.review(1)
     assert contract.get_epoch(1)["verdict"] == "PASS"
     assert direct_vm.run_validator(leader_result=direct_vm._captured_validators[-1][0]) is True
-    direct_vm.warp("2026-10-12T02:11:00Z")
+    warp(direct_vm, "2026-10-12T02:11:00Z")
     contract.close(1)
     assert contract.get_credit(addr(direct_bob)) == str(REWARD)
 
@@ -75,7 +79,7 @@ def test_release_history_pass_and_fixed_credits(direct_vm, direct_deploy, direct
     assert direct_vm.run_validator(leader_result=direct_vm._captured_validators[-1][0]) is True
     assert contract.get_epoch(2)["corrected"] == "1"
     assert contract.get_epoch(2)["baseline_epoch"] == "1"
-    direct_vm.warp("2026-10-12T03:11:00Z")
+    warp(direct_vm, "2026-10-12T03:11:00Z")
     contract.close(2)
     assert contract.get_credit(addr(direct_bob)) == str(2 * REWARD)
     assert contract.get_state()["total_credited"] == str(2 * REWARD)
@@ -84,11 +88,11 @@ def test_release_history_pass_and_fixed_credits(direct_vm, direct_deploy, direct
 def test_silent_removal_fails_and_refunds_sponsor(direct_vm, direct_deploy, direct_alice, direct_bob):
     contract = deploy(direct_vm, direct_deploy, direct_alice, direct_bob)
     fund(contract, direct_vm, direct_alice)
-    direct_vm.warp("2026-10-12T01:10:00Z")
+    warp(direct_vm, "2026-10-12T01:10:00Z")
     baseline, _ = release(1, [{"id": "route-1", "value": "Open"}], [])
     submit(contract, direct_vm, direct_bob, 1, "a" * 40, baseline)
     contract.review(1)
-    direct_vm.warp("2026-10-12T02:11:00Z")
+    warp(direct_vm, "2026-10-12T02:11:00Z")
     contract.close(1)
 
     removed, _ = release(2, [], [])
@@ -96,7 +100,7 @@ def test_silent_removal_fails_and_refunds_sponsor(direct_vm, direct_deploy, dire
     contract.review(2)
     assert contract.get_epoch(2)["verdict"] == "FAIL"
     assert contract.get_epoch(2)["removed"] == "1"
-    direct_vm.warp("2026-10-12T03:11:00Z")
+    warp(direct_vm, "2026-10-12T03:11:00Z")
     contract.close(2)
     assert contract.get_credit(addr(direct_alice)) == str(REWARD)
 
@@ -110,7 +114,7 @@ def test_missed_epoch_and_authorization(direct_vm, direct_deploy, direct_alice, 
     direct_vm.sender = direct_charlie
     with direct_vm.expect_revert("only_publisher"):
         contract.submit(1, "a" * 40, "b" * 64)
-    direct_vm.warp("2026-10-12T02:11:00Z")
+    warp(direct_vm, "2026-10-12T02:11:00Z")
     contract.close(1)
     assert contract.get_epoch(1)["state"] == "MISSED"
     assert contract.get_credit(addr(direct_alice)) == str(REWARD)
@@ -119,7 +123,7 @@ def test_missed_epoch_and_authorization(direct_vm, direct_deploy, direct_alice, 
 def test_wrong_digest_cannot_be_passed(direct_vm, direct_deploy, direct_alice, direct_bob):
     contract = deploy(direct_vm, direct_deploy, direct_alice, direct_bob)
     fund(contract, direct_vm, direct_alice)
-    direct_vm.warp("2026-10-12T01:10:00Z")
+    warp(direct_vm, "2026-10-12T01:10:00Z")
     body, _ = release(1, [{"id": "route-1", "value": "Open"}], [])
     direct_vm.sender = direct_bob
     contract.submit(1, "a" * 40, "f" * 64)
@@ -132,10 +136,10 @@ def test_wrong_digest_cannot_be_passed(direct_vm, direct_deploy, direct_alice, d
 def test_late_review_cannot_turn_expired_epoch_into_payment(direct_vm, direct_deploy, direct_alice, direct_bob):
     contract = deploy(direct_vm, direct_deploy, direct_alice, direct_bob)
     fund(contract, direct_vm, direct_alice)
-    direct_vm.warp("2026-10-12T01:10:00Z")
+    warp(direct_vm, "2026-10-12T01:10:00Z")
     body, _ = release(1, [{"id": "route-1", "value": "Open"}], [])
     submit(contract, direct_vm, direct_bob, 1, "a" * 40, body)
-    direct_vm.warp("2026-10-12T02:11:00Z")
+    warp(direct_vm, "2026-10-12T02:11:00Z")
     with direct_vm.expect_revert("review_window_closed"):
         contract.review(1)
     contract.close(1)
@@ -146,15 +150,15 @@ def test_late_review_cannot_turn_expired_epoch_into_payment(direct_vm, direct_de
 def test_next_release_uses_last_paid_baseline_after_missed_epoch(direct_vm, direct_deploy, direct_alice, direct_bob):
     contract = deploy(direct_vm, direct_deploy, direct_alice, direct_bob)
     fund(contract, direct_vm, direct_alice)
-    direct_vm.warp("2026-10-12T01:10:00Z")
+    warp(direct_vm, "2026-10-12T01:10:00Z")
     original, _ = release(1, [{"id": "route-1", "value": "Open"}], [])
     submit(contract, direct_vm, direct_bob, 1, "a" * 40, original)
     contract.review(1)
-    direct_vm.warp("2026-10-12T02:11:00Z")
+    warp(direct_vm, "2026-10-12T02:11:00Z")
     contract.close(1)
-    direct_vm.warp("2026-10-12T03:11:00Z")
+    warp(direct_vm, "2026-10-12T03:11:00Z")
     contract.close(2)
-    direct_vm.warp("2026-10-12T03:12:00Z")
+    warp(direct_vm, "2026-10-12T03:12:00Z")
     updated, _ = release(3, [{"id": "route-1", "value": "Open"}, {"id": "route-2", "value": "New"}],
                          [{"id": "route-2", "kind": "added", "reason": "A new route-2 timetable was published."}])
     submit(contract, direct_vm, direct_bob, 3, "c" * 40, updated)
@@ -167,11 +171,11 @@ def test_next_release_uses_last_paid_baseline_after_missed_epoch(direct_vm, dire
 def test_failed_release_can_be_corrected_once_with_prior_attempt_visible(direct_vm, direct_deploy, direct_alice, direct_bob):
     contract = deploy(direct_vm, direct_deploy, direct_alice, direct_bob)
     fund(contract, direct_vm, direct_alice)
-    direct_vm.warp("2026-10-12T01:10:00Z")
+    warp(direct_vm, "2026-10-12T01:10:00Z")
     original, _ = release(1, [{"id": "route-1", "value": "Open"}], [])
     submit(contract, direct_vm, direct_bob, 1, "a" * 40, original)
     contract.review(1)
-    direct_vm.warp("2026-10-12T02:11:00Z")
+    warp(direct_vm, "2026-10-12T02:11:00Z")
     contract.close(1)
     failed, _ = release(2, [], [])
     submit(contract, direct_vm, direct_bob, 2, "b" * 40, failed)
