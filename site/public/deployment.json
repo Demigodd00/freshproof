@@ -1,0 +1,9 @@
+{
+  "network": "studionet",
+  "chainId": 61999,
+  "address": null,
+  "sourceSha256": null,
+  "verified": false,
+  "note": "No FreshProof contract deployment has been verified yet. The interface must not offer live signing until this record is replaced with checked deployment evidence."
+}
+

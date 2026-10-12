@@ -1,0 +1,19 @@
+{
+  "name": "freshproof-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5198",
+    "build": "node scripts/sync-contract.mjs && tsc --noEmit && vite build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "genlayer-js": "1.1.8"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vite": "7.1.0",
+    "vitest": "3.2.0"
+  }
+}

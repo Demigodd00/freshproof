@@ -1,0 +1,12 @@
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+.artifacts/
+artifacts/
+node_modules/
+site/dist/
+site/.vite/
+site/public/contract-source.py
+*.log
+deployments/private-*.json
