@@ -48,7 +48,7 @@ describe('source-verified contract access',()=>{
 
   it('reads the deployed address from the SDK transaction format',async()=>{
     entries.set('freshproof:pending:61999',JSON.stringify({hash,method:'deploy',address:'0x'+'0'.repeat(40),account:address,createdAt:1}));
-    getTransaction.mockResolvedValueOnce({statusName:'FINALIZED',txExecutionResultName:'FINISHED_WITH_RETURN',resultName:'SUCCESS',txDataDecoded:{contractAddress:address}});
+    getTransaction.mockResolvedValueOnce({statusName:'FINALIZED',txExecutionResultName:'FINISHED_WITH_RETURN',resultName:'SUCCESS',txDataDecoded:{contractAddress:'0x'+'0'.repeat(40)},data:{contract_address:address}});
     await expect(pollPending()).resolves.toMatchObject({state:'success',contractAddress:address});
     expect(entries.has('freshproof:pending:61999')).toBe(false);
   });

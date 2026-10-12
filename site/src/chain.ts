@@ -197,8 +197,8 @@ export async function pollPending():Promise<{pending:Pending;state:'pending'|'su
   if(state==='unknown')return {pending,state};
   const decoded=r.txDataDecoded&&typeof r.txDataDecoded==='object'?r.txDataDecoded as Record<string,unknown>:{};
   const data=r.data&&typeof r.data==='object'?r.data as Record<string,unknown>:{};
-  const deployed=decoded.contractAddress??data.contract_address;
-  if(pending.method==='deploy'&&state==='success'&&!(typeof deployed==='string'&&addressPattern.test(deployed)))return {pending,state:'unknown'};
+  const deployed=[decoded.contractAddress,data.contract_address,data.contractAddress,r.contractAddress,r.recipient].find(value=>typeof value==='string'&&addressPattern.test(value)&&!/^0x0{40}$/i.test(value));
+  if(pending.method==='deploy'&&state==='success'&&!deployed)return {pending,state:'unknown'};
   localStorage.removeItem(pendingKey);
   return {pending,state,contractAddress:typeof deployed==='string'&&addressPattern.test(deployed)?deployed as Address:undefined};
 }

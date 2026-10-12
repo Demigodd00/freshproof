@@ -146,7 +146,7 @@ async function deploy(){
     if(!/^0x[0-9a-fA-F]{40}$/.test(publisher)||/^0x0{40}$/i.test(publisher)||publisher.toLowerCase()===wallet.address)throw new Error('Enter a nonzero publisher wallet different from the sponsor wallet.');
     if(!/^[A-Za-z0-9][A-Za-z0-9_.-]{0,80}$/.test(owner)||!/^[A-Za-z0-9][A-Za-z0-9_.-]{0,80}$/.test(repo)||!/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*\.json$/.test(path)||path.startsWith('.')||path.includes('/..'))throw new Error('Enter a safe public GitHub repository and JSON manifest path.');
     if(rule.length<24||rule.length>600||rule.includes('\0'))throw new Error('The frozen review rule must be 24–600 characters.');
-    if(!Number.isFinite(start)||start<=Math.floor(Date.now()/1000)+60||!Number.isSafeInteger(period)||period<3600||!Number.isSafeInteger(grace)||grace<0||grace>period||!Number.isInteger(count)||count<2||count>12||reward<=0n||reward>10n**20n)throw new Error('Check the future start time, cadence, grace, epoch count (2–12), and reward (up to 100 GEN).');
+    if(!Number.isFinite(start)||start<=Math.floor(Date.now()/1000)+600||!Number.isSafeInteger(period)||period<3600||!Number.isSafeInteger(grace)||grace<0||grace>period||!Number.isInteger(count)||count<2||count>12||reward<=0n||reward>10n**20n)throw new Error('Start at least 10 minutes ahead; check cadence, grace, epoch count (2–12), and reward (up to 100 GEN).');
     setBusy(true);
     const pending=await createCovenant(wallet,[publisher,owner,repo,path,rule,start,period,grace,count,reward]);
     message(`Creation submitted once. Wait for finality; transaction ${pending.hash}.`,'good');
