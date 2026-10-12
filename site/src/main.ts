@@ -1,8 +1,9 @@
 import './style.css';
-import {browserProvider,connectWallet,formatError,loadDeployment,pinnedUrl,pollPending,readCredit,readEpoch,readState,savedPending,send,verifyDeployment} from './chain';
-import type {Address,ChainState,Deployment,EpochState,Pending} from './chain';
+import {browserProvider,connectWallet,createCovenant,formatError,loadDeployment,pinnedUrl,pollPending,readCredit,readEpoch,readState,savedPending,send,verifyDeployment} from './chain';
+import type {Address,ChainState,Deployment,EpochState} from './chain';
 import {canonicalDelta,deriveDelta,disclosureCoverage,fetchPinnedManifest,rawUrl,sha256} from './verify';
 import type {Delta,Manifest} from './verify';
+import {formatGen as gen,parseGenAtto as atto} from './money';
 
 type Mode='example'|'live';
 type Inspection={current:Manifest;baseline:Manifest|null;delta:Delta;coverage:ReturnType<typeof disclosureCoverage>;digestOk:boolean;countsOk:boolean;currentUrl:string;baselineUrl:string|null};
@@ -33,7 +34,6 @@ function esc(input:unknown):string{return String(input??'').replace(/[&<>"']/g,c
 function short(input:string,n=8):string{return input.length>n*2+3?`${input.slice(0,n)}…${input.slice(-n)}`:input;}
 function message(value:string,kind:'info'|'error'|'good'='info'){notice=value;noticeKind=kind;render();}
 function readableTime(unix:string){return new Date(Number(unix)*1000).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'});}
-function gen(atto:string){const whole=BigInt(atto||'0');const leading=whole/10n**18n;const fraction=(whole%10n**18n).toString().padStart(18,'0').slice(0,5).replace(/0+$/,'');return `${leading}${fraction?'.'+fraction:''} GEN`;}
 function canSign(){return mode==='live'&&!!wallet&&!!configured&&viewing?.toLowerCase()===configured.toLowerCase()&&!savedPending()&&!busy;}
 function explorer(hash:string){return `https://explorer-studio.genlayer.com/transactions/${encodeURIComponent(hash)}`;}
 function contractExplorer(address:string){return `https://explorer-studio.genlayer.com/address/${encodeURIComponent(address)}`;}
@@ -111,8 +111,42 @@ async function checkPending(){
     if(!result){message('No saved transaction hash.','info');return;}
     if(result.state==='pending')message(`Transaction ${short(result.pending.hash)} has not reached finality. Do not resubmit.`);
     else if(result.state==='unknown')message(`Transaction ${short(result.pending.hash)} is finalized, but the execution outcome is unclear. The pending hash was preserved; inspect the explorer before retrying.`,'error');
-    else {message(`Transaction ${short(result.pending.hash)} finalized ${result.state==='success'?'successfully':'with an execution error'}.`,result.state==='success'?'good':'error');await refresh();}
+    else {
+      if(result.state==='success'&&result.pending.method==='deploy'&&result.contractAddress){
+        viewing=result.contractAddress;selected=1;history.replaceState(null,'',`?contract=${encodeURIComponent(viewing)}#releases`);
+        await refresh();
+        message(`Covenant deployed at ${viewing}. The app's verified deployment record still needs a source/receipt check before signing follow-up actions here.`,'good');
+      }else{
+        message(`Transaction ${short(result.pending.hash)} finalized ${result.state==='success'?'successfully':'with an execution error'}. ${result.pending.method==='deploy'&&!result.contractAddress?'Open the explorer to find its contract address.':''}`,result.state==='success'?'good':'error');
+        if(result.pending.method!=='deploy')await refresh();
+      }
+    }
   }catch(error){message(`Status check failed; pending hash was preserved. ${formatError(error)}`,'error');}
+  finally{setBusy(false);}
+}
+
+async function deploy(){
+  if(!wallet||busy||savedPending()){message('Connect a StudioNet wallet and resolve any pending transaction first.','error');return;}
+  const field=(id:string)=>document.querySelector<HTMLInputElement|HTMLTextAreaElement>(`#${id}`)?.value.trim()||'';
+  const publisher=field('new-publisher');
+  const owner=field('new-owner');
+  const repo=field('new-repo');
+  const path=field('new-path');
+  const rule=field('new-rule');
+  const start=Math.floor(new Date(field('new-start')).getTime()/1000);
+  const period=Math.floor(Number(field('new-period'))*3600);
+  const grace=Math.floor(Number(field('new-grace'))*60);
+  const count=Number(field('new-count'));
+  try{
+    const reward=atto(field('new-reward'));
+    if(!/^0x[0-9a-fA-F]{40}$/.test(publisher)||/^0x0{40}$/i.test(publisher)||publisher.toLowerCase()===wallet.address)throw new Error('Enter a nonzero publisher wallet different from the sponsor wallet.');
+    if(!/^[A-Za-z0-9][A-Za-z0-9_.-]{0,80}$/.test(owner)||!/^[A-Za-z0-9][A-Za-z0-9_.-]{0,80}$/.test(repo)||!/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*\.json$/.test(path)||path.startsWith('.')||path.includes('/..'))throw new Error('Enter a safe public GitHub repository and JSON manifest path.');
+    if(rule.length<24||rule.length>600||rule.includes('\0'))throw new Error('The frozen review rule must be 24–600 characters.');
+    if(!Number.isFinite(start)||start<=Math.floor(Date.now()/1000)+60||!Number.isSafeInteger(period)||period<3600||!Number.isSafeInteger(grace)||grace<0||grace>period||!Number.isInteger(count)||count<2||count>12||reward<=0n||reward>10n**20n)throw new Error('Check the future start time, cadence, grace, epoch count (2–12), and reward (up to 100 GEN).');
+    setBusy(true);
+    const pending=await createCovenant(wallet,[publisher,owner,repo,path,rule,start,period,grace,count,reward]);
+    message(`Creation submitted once. Wait for finality; transaction ${pending.hash}.`,'good');
+  }catch(error){message(formatError(error),'error');}
   finally{setBusy(false);}
 }
 
@@ -147,6 +181,10 @@ function renderPrior(){
   return `<div class="prior-release panel"><div class="panel-kicker">PREVIOUS REVISION <span>${esc(prior.prior_verdict||'unreviewed')}</span></div><p>Earlier commit ${short(prior.prior_commit_sha,10)} remains part of this epoch's signed history.</p><a href="${esc(pinnedUrl(state,prior.prior_commit_sha))}" target="_blank" rel="noopener noreferrer">View prior pinned manifest ↗</a></div>`;
 }
 
+function renderDeploy(){
+  return `<section class="create-section" id="create"><div class="section-intro"><p class="eyebrow">NEW COVENANT</p><h2>Set the terms before the first release.</h2><p>The sponsor wallet becomes the onchain sponsor. Creation does not transfer GEN; funding is a separate exact-amount transaction after verification.</p></div><div class="create-panel panel"><div class="create-grid"><label>Publisher wallet<input id="new-publisher" placeholder="0x…" spellcheck="false"></label><label>GitHub owner<input id="new-owner" value="Demigodd00" spellcheck="false"></label><label>Repository<input id="new-repo" value="freshproof" spellcheck="false"></label><label>Frozen manifest path<input id="new-path" value="evidence/demo/release.json" spellcheck="false"></label><label>First epoch starts (your local time)<input id="new-start" type="datetime-local"></label><label>Epoch duration (hours)<input id="new-period" type="number" min="1" value="24"></label><label>Grace period (minutes)<input id="new-grace" type="number" min="0" value="60"></label><label>Number of epochs<input id="new-count" type="number" min="2" max="12" value="3"></label><label>Reward per epoch (test GEN)<input id="new-reward" inputmode="decimal" value="0.001"></label><label class="wide">Frozen semantic review rule<textarea id="new-rule" rows="3">For every material correction or removal, the change log must identify the record ID and explain how the previous value differs from the new value and why the change was made.</textarea></label></div><div class="create-bottom"><button class="primary compact" data-action="deploy" ${!wallet||busy||savedPending()?'disabled':''}>Sign & create covenant →</button><p>Wallet: ${wallet?short(wallet.address):'not connected'} · StudioNet test GEN only. No automatic retries. A created contract must be independently verified and added to the deployment record before this app enables its subsequent writes.</p></div></div></section>`;
+}
+
 function renderActions(row:EpochState|undefined,writeReady:boolean){
   if(!state)return '';
   const now=Math.floor(Date.now()/1000);
@@ -161,7 +199,7 @@ function renderActions(row:EpochState|undefined,writeReady:boolean){
 function renderFooter(){return `<footer><div class="footer-main"><span class="wordmark"><span class="mark">F<span>•</span></span><span>freshproof<small>EVERY CHANGE LEAVES A TRACE</small></span></span><p>Honest release histories for public data. Built for GenLayer StudioNet.</p></div><div class="footer-links"><a href="#how">Method</a><a href="#releases">Workspace</a><a href="https://docs.genlayer.com/" target="_blank" rel="noopener noreferrer">GenLayer docs ↗</a></div><div class="footer-bottom">FreshProof verifies disclosed changes—not the factual truth of underlying data. <span>© 2026 FRESHPROOF</span></div></footer>`;}
 
 function render(){
-  app.innerHTML=`${renderHero()}<main>${renderHow()}<section class="workspace" id="releases">${renderMode()}${notice?`<div class="notice ${noticeKind}" role="status">${esc(notice)} <button data-action="dismiss" aria-label="Dismiss notice">×</button></div>`:''}${mode==='example'?renderExample():renderLive()+renderPrior()}</section><section class="closing"><span class="eyebrow">A DIFFERENT KIND OF PROOF</span><h2>The important question isn’t only<br><em>what’s in the data.</em></h2><p>It’s whether the public can see what changed, why, and who remains accountable when a release is missed.</p><a href="#releases">Explore the release ledger →</a></section></main>${renderFooter()}`;
+  app.innerHTML=`${renderHero()}<main>${renderHow()}<section class="workspace" id="releases">${renderMode()}${notice?`<div class="notice ${noticeKind}" role="status">${esc(notice)} <button data-action="dismiss" aria-label="Dismiss notice">×</button></div>`:''}${mode==='example'?renderExample():renderLive()+renderPrior()+renderDeploy()}</section><section class="closing"><span class="eyebrow">A DIFFERENT KIND OF PROOF</span><h2>The important question isn’t only<br><em>what’s in the data.</em></h2><p>It’s whether the public can see what changed, why, and who remains accountable when a release is missed.</p><a href="#releases">Explore the release ledger →</a></section></main>${renderFooter()}`;
 }
 
 app.addEventListener('click',async event=>{
@@ -190,6 +228,7 @@ app.addEventListener('click',async event=>{
   if(action==='review')await act('review',[selected]);
   if(action==='close')await act('close',[selected]);
   if(action==='withdraw')await act('withdraw');
+  if(action==='deploy')await deploy();
 });
 
 window.addEventListener('focus',()=>{if(savedPending())void checkPending();});

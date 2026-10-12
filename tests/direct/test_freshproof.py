@@ -41,6 +41,9 @@ def fund(contract, vm, sponsor):
 
 def submit(contract, vm, publisher, epoch, commit, body):
     vm.sender = publisher
+    from genlayer import gl
+    observed = gl.message_raw["datetime"]
+    print(f"CLOCK expected={vm._datetime} observed={observed} epoch={epoch} deadline={contract.get_epoch(epoch)['deadline']}")
     contract.submit(epoch, commit, hashlib.sha256(body.encode()).hexdigest())
     vm.mock_web(
         rf"raw\.githubusercontent\.com/Demigodd00/freshproof/{commit}/evidence/demo/release\.json",

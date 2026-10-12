@@ -7,7 +7,7 @@ export type Address=`0x${string}`;
 export type Hash=`0x${string}`;
 export type Provider={request(args:{method:string;params?:unknown[]}):Promise<unknown>};
 export type Deployment={network:'studionet';chainId:number;address:string|null;sourceSha256:string|null;verified:boolean;note?:string};
-export type Pending={hash:Hash;method:string;address:Address;account:Address;createdAt:number};
+export type Pending={hash:Hash;method:string;address:Address;account:Address;createdAt:number;sourceSha256?:string};
 export type ChainState={sponsor:string;publisher:string;repo:string;manifest_path:string;disclosure_rule:string;start_unix:string;period_seconds:string;grace_seconds:string;epoch_count:string;reward_atto:string;funded:boolean;next_epoch:string;last_pass_commit:string;last_pass_digest:string;last_pass_epoch:string;total_credited:string;total_withdrawn:string};
 export type EpochState={epoch:string;state:string;deadline:string;commit_sha?:string;manifest_sha256?:string;baseline_commit_sha?:string;baseline_sha256?:string;baseline_epoch?:string;revision?:string;prior_commit_sha?:string;prior_manifest_sha256?:string;prior_verdict?:string;verdict?:string;delta_sha256?:string;added?:string;corrected?:string;removed?:string;reviewed_at?:string};
 
@@ -138,7 +138,51 @@ export async function send(
   });
 }
 
-export async function pollPending():Promise<{pending:Pending;state:'pending'|'success'|'error'|'unknown'}|null>{
+export async function createCovenant(
+  wallet:{address:Address;provider:Provider},
+  args:[string,string,string,string,string,number,number,number,number,bigint],
+):Promise<Pending>{
+  if(signing||savedPending())throw new Error('A transaction is already pending. Check its status before another write.');
+  if(!navigator.locks)throw new Error('A modern HTTPS browser is required for safe wallet signing.');
+  const source=await fetch('/contract-source.py',{cache:'no-store'});
+  if(!source.ok)throw new Error('Published contract source is unavailable. Deployment is blocked.');
+  const code=(await source.text()).replaceAll('\r\n','\n');
+  const digest=await sha256(new TextEncoder().encode(code));
+  const zero='0x0000000000000000000000000000000000000000' as Address;
+  return navigator.locks.request('freshproof:sign:61999',{ifAvailable:true},async lock=>{
+    if(!lock)throw new Error('Another FreshProof tab is signing.');
+    signing=true;
+    let requested=false;
+    let known:Pending|undefined;
+    try{
+      await checkWallet(wallet.address,wallet.provider);
+      const guarded:Provider={request:async input=>{
+        const submitting=['eth_sendTransaction','eth_sendRawTransaction'].includes(input.method);
+        if(submitting){if(requested)throw new Error('A second wallet submission was blocked.');requested=true;}
+        const result=await wallet.provider.request(input);
+        if(submitting&&typeof result==='string'&&hashPattern.test(result)&&!known){
+          known={hash:result as Hash,method:'deploy',address:zero,account:wallet.address,createdAt:Date.now(),sourceSha256:digest};
+          localStorage.setItem(pendingKey,JSON.stringify(known));
+        }
+        return result;
+      }};
+      const writer=createClient({chain:chains.studionet,account:wallet.address,provider:guarded as never});
+      const hash=await writer.deployContract({code,args:args as Parameters<typeof writer.deployContract>[0]['args']});
+      if(!hashPattern.test(hash))throw new Error('Wallet returned no valid deployment transaction hash.');
+      if(known&&known.hash!==hash)throw new Error('Conflicting wallet and SDK transaction hashes.');
+      known??={hash:hash as Hash,method:'deploy',address:zero,account:wallet.address,createdAt:Date.now(),sourceSha256:digest};
+      localStorage.setItem(pendingKey,JSON.stringify(known));
+      return known;
+    }catch(error){
+      const detail=formatError(error);
+      if(known)throw new Error(`A deployment hash exists (${known.hash}); inspect it before retrying. ${detail}`);
+      if(requested)throw new Error(`Deployment submission status is uncertain. Check wallet Activity and the StudioNet explorer; no retry was sent. ${detail}`);
+      throw new Error(detail);
+    }finally{signing=false;}
+  });
+}
+
+export async function pollPending():Promise<{pending:Pending;state:'pending'|'success'|'error'|'unknown';contractAddress?:Address}|null>{
   const pending=savedPending();if(!pending)return null;
   const receipt=await reader.getTransaction({hash:pending.hash as Parameters<typeof reader.getTransaction>[0]['hash']});
   const r=receipt as unknown as Record<string,unknown>;
@@ -148,8 +192,9 @@ export async function pollPending():Promise<{pending:Pending;state:'pending'|'su
   const result=String(r.resultName??r.result_name??'').toUpperCase();
   const state=execution==='FINISHED_WITH_RETURN'&&result!=='FAILURE'?'success':execution==='FINISHED_WITH_ERROR'||result==='FAILURE'?'error':'unknown';
   if(state==='unknown')return {pending,state};
+  const deployed=(r.data&&typeof r.data==='object'?(r.data as Record<string,unknown>).contract_address:undefined);
   localStorage.removeItem(pendingKey);
-  return {pending,state};
+  return {pending,state,contractAddress:typeof deployed==='string'&&addressPattern.test(deployed)?deployed as Address:undefined};
 }
 
 export function pinnedUrl(state:ChainState,commit:string):string{
