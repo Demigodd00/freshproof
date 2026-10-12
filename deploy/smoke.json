@@ -1,0 +1,20 @@
+{
+  "network": "GenLayer StudioNet",
+  "purpose": "deployment-and-finalized-read smoke test only; not a funded public demo",
+  "transaction": "0x7162c759cd07548f5205a3fe4d6806f9ef68a7f3850e5810283838e4458ad5cc",
+  "address": "0xCD4095f7837B82746C161C9E4E96BEA964435Ea2",
+  "sourceSha256": "c6b0e662fd48b0ac4f129ca2e11500b12814312ac71a31d6dad8b643416254a9",
+  "checkedOn": "2026-10-12",
+  "checks": [
+    "FINALIZED with GenVM execution SUCCESS",
+    "get_state returned the frozen sponsor, publisher, repository, manifest path, epoch count, reward and unfunded state",
+    "get_epoch(1) returned OPEN"
+  ],
+  "notProven": [
+    "funding",
+    "publisher submission",
+    "validator review of public evidence",
+    "deadline settlement",
+    "pull withdrawal"
+  ]
+}

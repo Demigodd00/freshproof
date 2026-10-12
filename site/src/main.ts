@@ -203,7 +203,10 @@ function renderActions(row:EpochState|undefined,writeReady:boolean){
 function renderFooter(){return `<footer><div class="footer-main"><span class="wordmark"><span class="mark">F<span>•</span></span><span>freshproof<small>EVERY CHANGE LEAVES A TRACE</small></span></span><p>Honest release histories for public data. Built for GenLayer StudioNet.</p></div><div class="footer-links"><a href="#how">Method</a><a href="#releases">Workspace</a><a href="https://docs.genlayer.com/" target="_blank" rel="noopener noreferrer">GenLayer docs ↗</a></div><div class="footer-bottom">FreshProof verifies disclosed changes—not the factual truth of underlying data. <span>© 2026 FRESHPROOF</span></div></footer>`;}
 
 function render(){
+  const draftIds=['new-publisher','new-owner','new-repo','new-path','new-start','new-period','new-grace','new-count','new-reward','new-rule','commit-input','digest-input'];
+  const draft=new Map(draftIds.map(id=>[id,document.getElementById(id) as HTMLInputElement|HTMLTextAreaElement|null]).filter((item):item is [string,HTMLInputElement|HTMLTextAreaElement]=>item[1]!==null).map(([id,field])=>[id,field.value]));
   app.innerHTML=`${renderHero()}<main>${renderHow()}<section class="workspace" id="releases">${renderMode()}${notice?`<div class="notice ${noticeKind}" role="status">${esc(notice)} <button data-action="dismiss" aria-label="Dismiss notice">×</button></div>`:''}${mode==='example'?renderExample():renderLive()+renderPrior()+renderDeploy()}</section><section class="closing"><span class="eyebrow">A DIFFERENT KIND OF PROOF</span><h2>The important question isn’t only<br><em>what’s in the data.</em></h2><p>It’s whether the public can see what changed, why, and who remains accountable when a release is missed.</p><a href="#releases">Explore the release ledger →</a></section></main>${renderFooter()}`;
+  for(const [id,value] of draft){const field=document.getElementById(id) as HTMLInputElement|HTMLTextAreaElement|null;if(field)field.value=value;}
 }
 
 app.addEventListener('click',async event=>{

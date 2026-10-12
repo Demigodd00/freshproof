@@ -88,6 +88,7 @@ class Epoch:
     reviewed_at: u256
 
 
+@allow_storage
 class FreshProof(gl.Contract):
     sponsor: Address
     publisher: Address

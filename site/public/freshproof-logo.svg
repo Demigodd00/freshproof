@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">FreshProof</title>
+  <desc id="desc">A lime change mark and three release nodes on a deep green field.</desc>
+  <defs>
+    <linearGradient id="field" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#164a3d"/>
+      <stop offset="1" stop-color="#092b26"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#field)"/>
+  <path d="M95 255 195 127 279 255 195 385Z" fill="none" stroke="#a9d96f" stroke-width="25" stroke-linejoin="round"/>
+  <path d="M279 255h99" fill="none" stroke="#a9d96f" stroke-width="25" stroke-linecap="round"/>
+  <circle cx="385" cy="255" r="17" fill="#f7faf0"/>
+  <path d="M314 343h127" stroke="#7aa98a" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="314" cy="343" r="12" fill="#a9d96f"/>
+  <circle cx="377" cy="343" r="12" fill="#a9d96f"/>
+  <circle cx="441" cy="343" r="12" fill="#f7faf0"/>
+</svg>
