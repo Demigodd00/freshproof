@@ -31,4 +31,4 @@ pnpm test
 pnpm build
 ```
 
-See [architecture](docs/ARCHITECTURE.md) and [evidence format](docs/EVIDENCE_FORMAT.md).
+See [architecture](docs/ARCHITECTURE.md), [evidence format](docs/EVIDENCE_FORMAT.md), and [two commit-pinned example releases](docs/DEMO.md).
